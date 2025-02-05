@@ -4,6 +4,7 @@ metadata:
   name: {{ include "hello-world.fullname" . }}
   labels:
     {{- include "hello-world.labels" . | nindent 4 }}
+    version: {{ .Chart.appVersion }}
 spec:
   replicas: {{ .Values.replicaCount }}
   selector:
@@ -19,5 +20,3 @@ spec:
         - name: {{ .Chart.Name }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          command: [ "/bin/bash", "-c", "--" ]
-          args: [ "while true; do echo sleep 30; sleep 30; done;" ]
