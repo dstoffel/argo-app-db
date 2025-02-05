@@ -1,0 +1,15 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: upgrade-db
+  annotations:
+    "helm.sh/hook": pre-upgrade
+    "helm.sh/hook-weight": "1"
+spec:
+  template:
+    spec:
+      containers:
+        - name: db-upgrade
+          image: nginx
+          command: ["sh", "-c", "echo pre-upgrade; sleep 60"]
+      restartPolicy: Never

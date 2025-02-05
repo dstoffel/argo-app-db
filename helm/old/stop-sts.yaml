@@ -1,0 +1,14 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: stop-statefulset
+  annotations:
+    "argocd.argoproj.io/hook": PreSync
+spec:
+  template:
+    spec:
+      containers:
+        - name: db-upgrade
+          image: nginx
+          command: ["sh", "-c", "echo stoping sts; sleep 60"]
+      restartPolicy: Never

@@ -1,7 +1,7 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: name: {{ include "hello-world.fullname" . }}-db
+  name: {{ include "hello-world.fullname" . }}-db
   annotations:
     "helm.sh/hook": pre-install
     "helm.sh/hook-delete-policy": before-hook-creation
