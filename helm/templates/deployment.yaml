@@ -4,7 +4,6 @@ metadata:
   name: {{ include "hello-world.fullname" . }}
   labels:
     {{- include "hello-world.labels" . | nindent 4 }}
-    version: "{{ .Chart.AppVersion }}"
 spec:
   replicas: {{ .Values.replicaCount }}
   selector:

@@ -8,32 +8,93 @@ metadata:
 spec:
   template:
     spec:
+      securityContext:
+        runAsUser: 799
+        runAsGroup: 799
+        runAsNonRoot: true
+        fsGroup: 799
+        seccompProfile:
+          type: "RuntimeDefault"
       serviceAccountName: {{ include "hello-world.fullname" . }}
       automountServiceAccountToken: true
-      containers:
+      initContainers:
         - name: db-init
           image: bitnami/kubectl
           command:
           - /bin/bash
           - -c
-          - | 
+          - |
             DEP='{{ include "hello-world.fullname" . }}'
             if kubectl get deployments.apps $DEP
             then
-              CURRENT_VERSION=$(kubectl get deployment $DEP -o jsonpath='{.metadata.labels.version}' | awk -F. '{print $1"."$2}')
-              NEW_VERSION=$(echo "{{ .Chart.AppVersion }}" | awk -F. '{print $1"."$2}')
+              WAIT="1m"
+              touch /tmp-init/CURRENT_VERSION
+              F_CURRENT_VERSION=$(kubectl get deployment $DEP -o jsonpath='{.metadata.labels.app\.kubernetes\.io/version}')
+              CURRENT_VERSION=$(echo "$F_CURRENT_VERSION" | awk -F. '{print $1"."$2}')
+              F_NEW_VERSION="{{ .Chart.AppVersion }}"
+              NEW_VERSION=$(echo "$F_NEW_VERSION" | awk -F. '{print $1"."$2}')
               if [ "$(printf "%s\n%s" "$CURRENT_VERSION" "$NEW_VERSION" | sort -V | head -n1)" != "$NEW_VERSION" ]; then
                 echo "Detected major or minor version upgrade: $CURRENT_VERSION -> $NEW_VERSION"
                 echo "Scaling down application to 0 replicas before upgrading db"
-                kubectl scale deployment $DEP --replicas=0 --timeout=5m
-                echo "application scaled to 0"
-                kubectl get pod
-                echo "upgrading DB"
+                kubectl scale deployment $DEP --replicas=0
+                echo "Application scaled to 0, waiting pod to be terminated"
+                kubectl wait --for=delete pod -l app.kubernetes.io/name=hello-world --timeout=1m || (echo POD still running after $WAIT , exiting; kubectl get pod; exit 1) || exit 1
+                echo "false" > /tmp-init/INSTALL
+                echo "${F_CURRENT_VERSION}" > /tmp-init/CURRENT_VERSION
+                echo "true" > /tmp-init/UPGRADE
               else
                 echo "Patch upgrade, skipping upgrade db: $CURRENT_VERSION -> $NEW_VERSION"
+                echo "false" > /tmp-init/UPGRADE
+                echo "false" > /tmp-init/INSTALL
               fi
             else
-              echo "Application not yet installed, initialazing db"
+              echo "true" > /tmp-init/INSTALL
+              echo "false" > /tmp-init/UPGRADE
+              echo "Application not yet installed"
             fi
-            sleep 15
+          volumeMounts:
+          - mountPath: /tmp-init
+            name: temp
+      containers:
+      - name: init-db
+        envFrom:
+        - configMapRef:
+            name: test-node-db-config
+        volumeMounts:
+          - mountPath: /config
+            name: test-node-config
+          - mountPath: /tmp-init
+            name: temp
+        image: "thingsboard/tb-pe-node:{{ .Chart.AppVersion }}PE"
+        command:
+        - /bin/bash
+        - -c
+        - |
+          export INSTALL_TB=$(cat /tmp-init/INSTALL)
+          export UPGRADE_TB=$(cat /tmp-init/UPGRADE)
+          export FROM_VERSION=$(cat /tmp-init/CURRENT_VERSION)
+          echo "Settings: INSTALL_TB=${INSTALL_TB} / UPGRADE_TB=${UPGRADE_TB} / FROM_VERSION=${FROM_VERSION}"
+          if [ "$INSTALL_TB" == "true" ] || [ "$UPGRADE_TB" == "true" ]; then
+            echo "Running start-tb-node.sh"
+            start-tb-node.sh; touch /tmp/install-finished;
+          else
+            echo "nothing to do, exiting"
+            exit 0
+          fi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
       restartPolicy: Never
+      volumes:
+        - name: 'test-node-config'
+          configMap:
+            name: 'test-node-config'
+            items:
+            - key: conf
+              path: thingsboard.conf
+            - key: logback
+              path: logback.xml
+        - name: temp
+          emptyDir: {}
