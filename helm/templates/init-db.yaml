@@ -43,7 +43,7 @@ spec:
                 echo "${F_CURRENT_VERSION}" > /tmp-init/CURRENT_VERSION
                 echo "true" > /tmp-init/UPGRADE
               else
-                echo "Patch upgrade, skipping upgrade db: $CURRENT_VERSION -> $NEW_VERSION"
+                echo "Patch upgrade or same version, skipping upgrade db: $CURRENT_VERSION -> $NEW_VERSION"
                 echo "false" > /tmp-init/UPGRADE
                 echo "false" > /tmp-init/INSTALL
               fi
