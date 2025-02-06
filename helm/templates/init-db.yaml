@@ -25,10 +25,10 @@ spec:
           - -c
           - |
             DEP='{{ include "hello-world.fullname" . }}'
+            touch /tmp-init/CURRENT_VERSION
             if kubectl get deployments.apps $DEP
             then
               WAIT="1m"
-              touch /tmp-init/CURRENT_VERSION
               F_CURRENT_VERSION=$(kubectl get deployment $DEP -o jsonpath='{.metadata.labels.app\.kubernetes\.io/version}')
               CURRENT_VERSION=$(echo "$F_CURRENT_VERSION" | awk -F. '{print $1"."$2}')
               F_NEW_VERSION="{{ .Chart.AppVersion }}"
